@@ -1,11 +1,13 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 int commentsLength = 100; // global to store the size of the comments pointer
 
 struct PPMPixel {
-    unsigned int red, green, blue;
+    // rgb[0] is the red value of the pixel, rgb[1] is green and rgb[2] is blue
+    unsigned int rgb[3]; 
 };
 
 struct PPM {
@@ -32,14 +34,19 @@ int containsElement(int a, int arr[], int len) {
 }
 
 // return true when i is even
-int isEven(int i) { return (i % 2 == 0); }
+int isEven(int i) { return (i % 2 == 0) ? 1 : 0; }
 
 // return true when i is odd
-int isOdd(int i) { return (i % 2 == 1); }
+int isOdd(int i) { return (i % 2 == 1) ? 1 : 0; }
 
 // return true when i and j are both even or odd
 int isSame(int i, int j) {
     return ((isEven(i) && isEven(j)) || (isOdd(i) && isOdd(j))); 
+}
+
+// return true if c is in the alphabet
+int isAscii(char c) {
+    return c < 128;
 }
 
 /* 
@@ -61,7 +68,7 @@ int append(char c, struct PPM *im) {
         }
     }
 
-    // append the char to the comments pointer
+    // append c to the comments pointer
     im->comments[len] = c;
     im->comments[len+1] = '\0';
     return len;
@@ -162,9 +169,9 @@ struct PPM * getPPM(FILE *f) {
             ungetc(c, f);
             // Grab the next three integers and assign them to r, g, b
             if (fscanf(f, "%d%d%d", &r, &g, &b) == 3) {
-                im->pixels[i].red = r;
-                im->pixels[i].green = g;
-                im->pixels[i].blue = b;
+                im->pixels[i].rgb[0] = r;
+                im->pixels[i].rgb[1] = g;
+                im->pixels[i].rgb[2] = b;
             }
             i++;
         }
@@ -182,7 +189,7 @@ void showPPM(struct PPM *im) {
         if ((i % im->width == 0) && i > 0) {
             printf("\n");
         }
-        printf("%d %d %d ", im->pixels[i].red, im->pixels[i].green, im->pixels[i].blue);
+        printf("%d %d %d ", im->pixels[i].rgb[0], im->pixels[i].rgb[1], im->pixels[i].rgb[2]);
     }
 
     printf("\n");
@@ -192,25 +199,26 @@ struct PPM * encode(struct PPM * im, char * message, unsigned int mSize, unsigne
 
     int imgSize = im->height * im->width;
     int length = strlen(message); // length of the message
-    if (imgSize < length * 3) { // need at least 3 pixels per character to encode
-        return NULL;
+    if (imgSize < length * 3) { // if there isn't enough pixels to encode the message then return null
+        return NULL; 
     }
 
     int msgCount = 0; // number of characters that have been encoded
-    int pixelPos[length - 1]; // array to store pixels that have been encoded
+    int pixelPos[imgSize]; // array to store pixels that have been encoded
     int numPixels = 0; // number of pixels that have been encoded
     int bitsCount; // number of bits that need to be encoded
     char c;
-    int charBits[7];
+    int charBits[7]; // stores the ascii code of a character 
+    int pixelChoice;
     
-    // first seed random number generator
+    // seed the random number generator
     srand(secret);
 
     while (msgCount < length) {
 
         bitsCount = 7;
-        c = message[msgCount];
-
+        c = message[msgCount]; // get the character from the message 
+        
         // put the ascii code for c in charBits
         for (int i = 7; i >= 0; i--) {
             charBits[i] = ( c >> i ) & 1 ? 1 : 0;
@@ -219,58 +227,89 @@ struct PPM * encode(struct PPM * im, char * message, unsigned int mSize, unsigne
         while (bitsCount >= 0) {
 
             // pick random pixel
-            int pixelChoice = (rand() % imgSize);
-            // if that pixel has been picked before
-            // then pick new pixel
+            pixelChoice = rand() % imgSize;
+            // if that pixel has been picked before then pick new pixel
             while (containsElement(pixelChoice, pixelPos, numPixels)) {
-                pixelChoice = (rand() % imgSize);
+                pixelChoice = rand() % imgSize;
             }
             // add the pixel choice to the array of prev chosen pixels
             pixelPos[numPixels] = pixelChoice;
             // increment the num of pixels
             numPixels++;
 
-            if (bitsCount >= 0) {
-                printf("R VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].red, charBits[bitsCount], pixelChoice, bitsCount);
-                if (!isSame(im->pixels[pixelChoice].red, charBits[bitsCount])) {
-                    im->pixels[pixelChoice].red = im->pixels[pixelChoice].red + 1;
-                    printf("R VAL: %d BIT: %d PIXEL: %d BC: %d -- Change\n", im->pixels[pixelChoice].red, charBits[bitsCount], pixelChoice, bitsCount);
+            // loop through the rgb values of each pixel
+            for (int i = 0; i <= 2; i++) {
+                if (bitsCount >= 0) {
+                    //printf("RGB: %d PIXEL VAL: %d BIT: %d PIXEL: %d BC: %d\n", i, im->pixels[pixelChoice].rgb[i], charBits[bitsCount], pixelChoice, bitsCount);
+                    if (!isSame(im->pixels[pixelChoice].rgb[i], charBits[bitsCount])) {
+                        im->pixels[pixelChoice].rgb[i]++;
+                        //printf("RGB: %d PIXEL VAL: %d BIT: %d PIXEL: %d BC: %d -- Change\n", i, im->pixels[pixelChoice].rgb[i], charBits[bitsCount], pixelChoice, bitsCount);
+                    }
+                    bitsCount--;
                 }
-                bitsCount = bitsCount - 1;
             }
-            //printf("R VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].red, charBits[bitsCount], pixelChoice, bitsCount);
-            
-            if (bitsCount >= 0) {
-                printf("G VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].green, charBits[bitsCount], pixelChoice, bitsCount);
-                if (!isSame(im->pixels[pixelChoice].green, charBits[bitsCount])) {
-                    im->pixels[pixelChoice].green = im->pixels[pixelChoice].green + 1;
-                    printf("G VAL: %d BIT: %d PIXEL: %d BC: %d -- Change\n", im->pixels[pixelChoice].green, charBits[bitsCount], pixelChoice, bitsCount);
-                }
-                bitsCount = bitsCount - 1;
-            } 
-            //printf("G VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].green, charBits[bitsCount], pixelChoice, bitsCount);
-
-            if (bitsCount >= 0) {
-                printf("B VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].blue, charBits[bitsCount], pixelChoice, bitsCount);
-                if (!isSame(im->pixels[pixelChoice].blue, charBits[bitsCount])) {
-                    im->pixels[pixelChoice].blue = im->pixels[pixelChoice].blue + 1;
-                    printf("B VAL: %d BIT: %d PIXEL: %d BC: %d -- Change\n", im->pixels[pixelChoice].blue, charBits[bitsCount], pixelChoice, bitsCount);
-                }
-                bitsCount = bitsCount - 1;
-            }
-            //printf("B VAL: %d BIT: %d PIXEL: %d BC: %d\n", im->pixels[pixelChoice].blue, charBits[bitsCount], pixelChoice, bitsCount);
         }
-
-        msgCount++;
-
+        msgCount++; // increment to the next character
     }
-
     return im;
-    
 }
 
 char * decode(struct PPM * im, unsigned int secret) {
 
+    int imgSize = im->height * im->width;
+    int length = floor((imgSize / 3)); // length of the message
+  
+    int msgCount = 0; // number of characters that have been encoded
+    int pixelPos[imgSize]; // array to store pixels that have been encoded
+    int numPixels = 0; // number of pixels that have been encoded
+    int bitsCount; // number of bits that need to be encoded
+    char c;
+    char bit;
+    int pixelChoice;
+    char * charBits = malloc(7 * sizeof(char));
+    char * message = malloc(length * sizeof(char));
+    
+    // seed the random number generator
+    srand(secret);
+
+    while (msgCount < length) {
+
+        bitsCount = 7;
+        while (bitsCount >= 0) {
+
+            // pick random pixel
+            pixelChoice = rand() % imgSize;
+            // if that pixel has been picked before then pick new pixel
+            while (containsElement(pixelChoice, pixelPos, numPixels)) {
+                pixelChoice = rand() % imgSize;
+            }
+            // add the pixel choice to the array of prev chosen pixels
+            pixelPos[numPixels] = pixelChoice;
+            // increment the num of pixels
+            numPixels++;
+
+            // loop through the rgb values of each pixel
+            for (int i = 0; i <= 2; i++) {
+                if (bitsCount >= 0) {
+                    //printf("BIT: %d BITSCOUNT: %d CHAR: %c PIXELCHOICE: %d\n", isOdd(im->pixels[pixelChoice].rgb[i]), bitsCount, (char)(isOdd(im->pixels[pixelChoice].rgb[i]) + '0'), pixelChoice);
+                    bit = isOdd(im->pixels[pixelChoice].rgb[i]) + '0'; // convert bit integer to character
+                    // bit come in from least to most significant figures 
+                    // but the array needs to store them from most to least  
+                    charBits[7 - bitsCount] = bit;
+                    if (bitsCount == 0) {
+                        c = strtol(charBits, (char**)NULL, 2); // convert the binary string charBits to a character
+                        //printf("CHAR: %c MSGCOUNT: %d\n", c, msgCount);
+                        message[msgCount] = c;
+                        memset(charBits, 0, sizeof(charBits));
+                    }
+                    bitsCount--;
+                }
+            }    
+        }
+        msgCount++; // increment to the next character
+    }
+    message[msgCount] = '\0';
+    return message;
 }
 
 int main(int argc, char ** argv) {
@@ -282,12 +321,15 @@ int main(int argc, char ** argv) {
 
     FILE *f = fopen(argv[1], "r");
     struct PPM *im = getPPM(f);
-    showPPM(im);
+    //showPPM(im);
 
-    char * p = "xaa";
-    printf("\n");
+    char * encodedMessage = "harrisu";
 
-    encode(im, p, 1, 123);
+    im = encode(im, encodedMessage, 1, 123);
+    //showPPM(im);
+
+    char * decodedMessage = decode(im, 123);
+    printf("%s\n", decodedMessage);
 
     return 0;
 }
