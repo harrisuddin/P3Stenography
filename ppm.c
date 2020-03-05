@@ -26,7 +26,8 @@ int containsElement(int a, int arr[], int len) {
         return 0;
     }
 
-    for (int i = 0; i < len; i++) {
+    int i;
+    for (i = 0; i < len; i++) {
         if (arr[i] == a) return 1;
     }
 
@@ -42,11 +43,6 @@ int isOdd(int i) { return (i % 2 == 1) ? 1 : 0; }
 // return true when i and j are both even or odd
 int isSame(int i, int j) {
     return ((isEven(i) && isEven(j)) || (isOdd(i) && isOdd(j))); 
-}
-
-// return true if c is in the alphabet
-int isAscii(char c) {
-    return c < 128;
 }
 
 /* 
@@ -158,15 +154,15 @@ struct PPM * getPPM(FILE *f) {
     }
 
     // store all the pixels
-    int c, r, g, b;
+    int r, g, b;
     int i = 0;
     int imgSize = im->width * im->height;
     // For each pixel
     while (i < imgSize) {
         // While the next character is not EOF
-        if ((c = fgetc(f)) != EOF) {
-            /* Return the character */
-            ungetc(c, f);
+        if ((ch = fgetc(f)) != EOF) {
+            // Return the character
+            ungetc(ch, f);
             // Grab the next three integers and assign them to r, g, b
             if (fscanf(f, "%d%d%d", &r, &g, &b) == 3) {
                 im->pixels[i].rgb[0] = r;
@@ -184,22 +180,21 @@ void showPPM(struct PPM *im) {
     printf("P3\n"); // print the P3 header
     printf("%s", im->comments); // print all comments
     printf("%d %d\n%d\n", im->width, im->height, im->max); // print the image size and max rgb value
+    
     // display each pixel
-    for (int i = 0; i < (im->width * im->height); i++) {
+    int i;
+    for (i = 0; i < (im->width * im->height); i++) {
         if ((i % im->width == 0) && i > 0) {
             printf("\n");
         }
         printf("%d %d %d ", im->pixels[i].rgb[0], im->pixels[i].rgb[1], im->pixels[i].rgb[2]);
     }
-
-    printf("\n");
 }
 
 struct PPM * encode(struct PPM * im, char * message, unsigned int mSize, unsigned int secret) {
 
     int imgSize = im->height * im->width;
-    int length = strlen(message); // length of the message
-    if (imgSize < length * 3) { // if there isn't enough pixels to encode the message then return null
+    if (imgSize < mSize * 3) { // if there isn't enough pixels to encode the message then return null
         return NULL; 
     }
 
@@ -214,13 +209,14 @@ struct PPM * encode(struct PPM * im, char * message, unsigned int mSize, unsigne
     // seed the random number generator
     srand(secret);
 
-    while (msgCount < length) {
+    while (msgCount < mSize) {
 
         bitsCount = 7;
         c = message[msgCount]; // get the character from the message 
         
         // put the ascii code for c in charBits
-        for (int i = 7; i >= 0; i--) {
+        int i;
+        for (i = 7; i >= 0; i--) {
             charBits[i] = ( c >> i ) & 1 ? 1 : 0;
         }
 
@@ -238,11 +234,12 @@ struct PPM * encode(struct PPM * im, char * message, unsigned int mSize, unsigne
             numPixels++;
 
             // loop through the rgb values of each pixel
-            for (int i = 0; i <= 2; i++) {
+            int j;
+            for (j = 0; j <= 2; j++) {
                 if (bitsCount >= 0) {
                     //printf("RGB: %d PIXEL VAL: %d BIT: %d PIXEL: %d BC: %d\n", i, im->pixels[pixelChoice].rgb[i], charBits[bitsCount], pixelChoice, bitsCount);
-                    if (!isSame(im->pixels[pixelChoice].rgb[i], charBits[bitsCount])) {
-                        im->pixels[pixelChoice].rgb[i]++;
+                    if (!isSame(im->pixels[pixelChoice].rgb[j], charBits[bitsCount])) {
+                        im->pixels[pixelChoice].rgb[j]++;
                         //printf("RGB: %d PIXEL VAL: %d BIT: %d PIXEL: %d BC: %d -- Change\n", i, im->pixels[pixelChoice].rgb[i], charBits[bitsCount], pixelChoice, bitsCount);
                     }
                     bitsCount--;
@@ -289,7 +286,8 @@ char * decode(struct PPM * im, unsigned int secret) {
             numPixels++;
 
             // loop through the rgb values of each pixel
-            for (int i = 0; i <= 2; i++) {
+            int i;
+            for (i = 0; i <= 2; i++) {
                 if (bitsCount >= 0) {
                     //printf("BIT: %d BITSCOUNT: %d CHAR: %c PIXELCHOICE: %d\n", isOdd(im->pixels[pixelChoice].rgb[i]), bitsCount, (char)(isOdd(im->pixels[pixelChoice].rgb[i]) + '0'), pixelChoice);
                     bit = isOdd(im->pixels[pixelChoice].rgb[i]) + '0'; // convert bit integer to character
@@ -314,22 +312,30 @@ char * decode(struct PPM * im, unsigned int secret) {
 
 int main(int argc, char ** argv) {
 
-    if (argc != 2) {
-        printf("Not enough args.\n");
-        exit(0);
+    unsigned int secret;
+    FILE *f;
+    
+    if (argv[1] != NULL) {
+        if (!strcmp("e", argv[1])) {
+            if (argv[2] != NULL) {
+                char encodedMessage[100];
+                // get the message and secret value
+                scanf("%[^\n]%*c", encodedMessage);
+                scanf("%d", &secret);
+                // open the file, create the ppm object and encode the message into it
+                f = fopen(argv[2], "r");
+                struct PPM *im = getPPM(f);
+                im = encode(im, encodedMessage, strlen(encodedMessage), secret);
+                showPPM(im);
+            }
+        } else if (!strcmp("d", argv[1])) {
+            if (argv[2] != NULL) {
+                scanf("%d", &secret);
+                f = fopen(argv[2], "r");
+                struct PPM *im = getPPM(f);
+                printf("%s\n", decode(im, secret));
+            }
+        }
     }
-
-    FILE *f = fopen(argv[1], "r");
-    struct PPM *im = getPPM(f);
-    //showPPM(im);
-
-    char * encodedMessage = "harrisu";
-
-    im = encode(im, encodedMessage, 1, 123);
-    //showPPM(im);
-
-    char * decodedMessage = decode(im, 123);
-    printf("%s\n", decodedMessage);
-
     return 0;
 }
